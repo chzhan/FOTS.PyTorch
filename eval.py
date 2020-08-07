@@ -3,24 +3,26 @@ import torch
 import logging
 import pathlib
 import traceback
-from model.model import FOTSModel
-from utils.bbox import Toolbox
+from FOTS.model.model import FOTSModel
+from FOTS.utils.bbox import Toolbox
 
 logging.basicConfig(level=logging.DEBUG, format='')
 
 
 def load_model(model_path, with_gpu):
     logger.info("Loading checkpoint: {} ...".format(model_path))
-    checkpoints = torch.load(model_path)
+    checkpoints = torch.load(model_path, map_location = 'cpu')
     if not checkpoints:
         raise RuntimeError('No checkpoint found.')
     config = checkpoints['config']
     state_dict = checkpoints['state_dict']
     model = FOTSModel(config)
-    model = torch.nn.DataParallel(model)
+    if with_gpu:
+        model.parallelize()
     model.load_state_dict(state_dict)
     if with_gpu:
-        model = model.cuda()
+        model.to(torch.device('cuda'))
+    model.eval()
     return model
 
 
@@ -30,6 +32,7 @@ def main(args:argparse.Namespace):
     output_dir = args.output_dir
     with_image = True if output_dir else False
     with_gpu = True if torch.cuda.is_available() else False
+    #with_gpu = False
 
     model = load_model(model_path, with_gpu)
 
@@ -37,6 +40,7 @@ def main(args:argparse.Namespace):
         try:
             with torch.no_grad():
                 ploy, im = Toolbox.predict(image_fn, model, with_image, output_dir, with_gpu)
+                print(len(ploy))
         except Exception as e:
             traceback.print_exc()
 

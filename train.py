@@ -4,15 +4,15 @@ import logging
 import os
 import pathlib
 
-from data_loader import SynthTextDataLoaderFactory
-from data_loader import OCRDataLoaderFactory
-from data_loader.dataset import ICDAR
-from logger import Logger
-from model.loss import *
-from model.model import *
-from model.metric import *
-from trainer import Trainer
-from utils.bbox import Toolbox
+from FOTS.data_loader import SynthTextDataLoaderFactory
+from FOTS.data_loader import OCRDataLoaderFactory
+from FOTS.data_loader import ICDAR
+from FOTS.logger import Logger
+from FOTS.model.model import *
+from FOTS.model.loss import *
+from FOTS.model.metric import *
+from FOTS.trainer import Trainer
+from FOTS.utils.bbox import Toolbox
 
 logging.basicConfig(level=logging.DEBUG, format='')
 
@@ -33,10 +33,10 @@ def main(config, resume):
         val = data_loader.val()
 
     os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(i) for i in config['gpus']])
-    model = eval(config['arch'])(config['model'])
+    model = eval(config['arch'])(config)
     model.summary()
 
-    loss = eval(config['loss'])(config['model'])
+    loss = eval(config['loss'])(config)
     metrics = [eval(metric) for metric in config['metrics']]
 
     trainer = Trainer(model, loss, metrics,
@@ -62,14 +62,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     config = None
-    if args.resume is not None:
-        if args.config is not None:
-            logger.warning('Warning: --config overridden by --resume')
-        config = torch.load(args.resume)['config']
-    elif args.config is not None:
+    if args.config is not None:
         config = json.load(open(args.config))
         path = os.path.join(config['trainer']['save_dir'], config['name'])
-        assert not os.path.exists(path), "Path {} already exists!".format(path)
+        #assert not os.path.exists(path), "Path {} already exists!".format(path)
+    else:
+        if args.resume is not None:
+            logger.warning('Warning: --config overridden by --resume')
+            config = torch.load(args.resume, map_location = 'cpu')['config']
+
     assert config is not None
 
     main(config, args.resume)
